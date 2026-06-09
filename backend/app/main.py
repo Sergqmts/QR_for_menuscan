@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.auth import router as auth_router
 from app.api.venues import router as venues_router
 from app.api.tables import router as tables_router
+from app.api.categories import router as categories_router
+from app.api.dishes import router as dishes_router
 
 app = FastAPI(title="MenuScan API", version="0.1.0")
 
@@ -17,6 +19,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(venues_router)
 app.include_router(tables_router)
+app.include_router(categories_router)
+app.include_router(dishes_router)
 
 
 @app.get("/health")
