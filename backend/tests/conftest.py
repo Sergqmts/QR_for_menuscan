@@ -1,3 +1,5 @@
+import asyncio
+import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -8,27 +10,37 @@ from app.models.base import Base
 
 TEST_DATABASE_URL = "postgresql+asyncpg://menuscan:menuscan@localhost:5432/menuscan_test"
 
-test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False)
 
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_db():
+    async def _create():
+        engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        await engine.dispose()
 
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def setup_test_db():
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    async def _drop():
+        engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        await engine.dispose()
+
+    asyncio.run(_create())
     yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+    asyncio.run(_drop())
 
 
-@pytest_asyncio.fixture()
+@pytest_asyncio.fixture(loop_scope="session")
 async def db_session():
-    async with TestSessionLocal() as session:
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+    async with SessionLocal() as session:
         yield session
         await session.rollback()
+    await engine.dispose()
 
 
-@pytest_asyncio.fixture()
+@pytest_asyncio.fixture(loop_scope="session")
 async def client(db_session: AsyncSession):
     async def override_get_db():
         yield db_session
