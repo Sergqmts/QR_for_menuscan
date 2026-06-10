@@ -30,8 +30,9 @@ async def patch_order_status(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    order = await update_order_status(db, order_id, data.status)
+    order = await get_order_with_items(db, order_id)
     await get_venue_or_404(db, order.venue_id, user.id)
+    order = await update_order_status(db, order_id, data.status)
     items_result = await db.execute(select(OrderItem).where(OrderItem.order_id == order_id))
     order.__dict__["items"] = items_result.scalars().all()
     return OrderOut.model_validate(order)
