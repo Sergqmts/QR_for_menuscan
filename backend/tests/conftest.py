@@ -1,8 +1,12 @@
 import asyncio
+import os
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://menuscan:menuscan@localhost:5432/menuscan_test")
+os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 
 from app.main import app
 from app.core.database import get_db

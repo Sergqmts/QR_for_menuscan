@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+import uuid as uuid_mod
+
 from app.api.auth import router as auth_router
 from app.api.venues import router as venues_router
 from app.api.tables import router as tables_router
@@ -9,6 +11,7 @@ from app.api.menu import router as menu_router
 from app.api.parse import router as parse_router
 from app.api.qr import router as qr_router
 from app.api.orders import router as orders_router
+from app.core.database import AsyncSessionLocal
 
 app = FastAPI(title="MenuScan API", version="0.1.0")
 
@@ -29,6 +32,29 @@ app.include_router(menu_router)
 app.include_router(parse_router)
 app.include_router(qr_router)
 app.include_router(orders_router)
+
+
+@app.websocket("/ws/table/{table_id}")
+async def websocket_table(
+    websocket: WebSocket,
+    table_id: uuid_mod.UUID,
+    guest_id: str = "",
+    venue_id: str = "",
+):
+    from app.ws.table import ws_table_handler
+    async with AsyncSessionLocal() as db:
+        await ws_table_handler(websocket, table_id, guest_id, venue_id, db)
+
+
+@app.websocket("/ws/kitchen/{venue_id}")
+async def websocket_kitchen(
+    websocket: WebSocket,
+    venue_id: uuid_mod.UUID,
+    token: str = "",
+):
+    from app.ws.kitchen import ws_kitchen_handler
+    async with AsyncSessionLocal() as db:
+        await ws_kitchen_handler(websocket, venue_id, token, db)
 
 
 @app.get("/health")
