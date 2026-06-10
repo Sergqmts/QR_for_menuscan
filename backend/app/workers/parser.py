@@ -63,6 +63,51 @@ def parse_csv_content(csv_content: str) -> list[dict]:
     return results
 
 
+def _compute_diff(existing_dishes: list, parsed_dishes: list) -> list[dict]:
+    existing_by_name = {d.name.lower(): d for d in existing_dishes}
+    parsed_names = {d["name"].lower() for d in parsed_dishes}
+    diff = []
+
+    for parsed in parsed_dishes:
+        name_key = parsed["name"].lower()
+        if name_key in existing_by_name:
+            existing = existing_by_name[name_key]
+            changes = {}
+            if parsed.get("price") is not None and abs(float(existing.price) - float(parsed["price"])) > 0.01:
+                changes["old_price"] = float(existing.price)
+                changes["new_price"] = float(parsed["price"])
+            if parsed.get("weight") and parsed["weight"] != existing.weight:
+                changes["old_weight"] = existing.weight
+                changes["new_weight"] = parsed["weight"]
+            if changes:
+                diff.append({
+                    "dish_id": str(existing.id),
+                    "action": "update",
+                    "name": existing.name,
+                    **changes,
+                })
+        else:
+            diff.append({
+                "dish_id": None,
+                "action": "add",
+                "name": parsed["name"],
+                "new_price": float(parsed["price"]),
+                "new_weight": parsed.get("weight"),
+                "description": parsed.get("description"),
+            })
+
+    for name_key, existing in existing_by_name.items():
+        if name_key not in parsed_names:
+            diff.append({
+                "dish_id": str(existing.id),
+                "action": "remove",
+                "name": existing.name,
+                "old_price": float(existing.price),
+            })
+
+    return diff
+
+
 async def run_parse_job(db: AsyncSession, job_id: uuid.UUID) -> None:
     from app.models.parse_job import ParseJob
     from app.models.venue import Venue
@@ -94,6 +139,18 @@ async def run_parse_job(db: AsyncSession, job_id: uuid.UUID) -> None:
 
         venue_result = await db.execute(select(Venue).where(Venue.id == job.venue_id))
         venue = venue_result.scalar_one()
+
+        if job.diff_mode:
+            existing_result = await db.execute(select(Dish).where(Dish.venue_id == venue.id))
+            existing_dishes = existing_result.scalars().all()
+            diff = _compute_diff(existing_dishes, dishes_data)
+            job.diff_data = diff
+            job.status = "done"
+            job.dishes_found = len(dishes_data)
+            job.finished_at = datetime.now(timezone.utc)
+            venue.parse_status = "done"
+            await db.commit()
+            return
 
         cat_result = await db.execute(
             select(Category).where(Category.venue_id == venue.id, Category.slug == "uncategorized")
