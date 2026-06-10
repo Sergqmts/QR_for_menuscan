@@ -20,12 +20,12 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.drop_constraint('orders_venue_id_fkey', 'orders', type_='foreignkey')
     op.drop_constraint('orders_table_id_fkey', 'orders', type_='foreignkey')
-    op.create_foreign_key(None, 'orders', 'venues', ['venue_id'], ['id'], ondelete='CASCADE')
-    op.create_foreign_key(None, 'orders', 'tables', ['table_id'], ['id'], ondelete='CASCADE')
+    op.create_foreign_key('orders_venue_id_fkey', 'orders', 'venues', ['venue_id'], ['id'], ondelete='CASCADE')
+    op.create_foreign_key('orders_table_id_fkey', 'orders', 'tables', ['table_id'], ['id'], ondelete='CASCADE')
 
 
 def downgrade() -> None:
-    op.drop_constraint(None, 'orders', type_='foreignkey')
-    op.drop_constraint(None, 'orders', type_='foreignkey')
-    op.create_foreign_key(None, 'orders', 'venues', ['venue_id'], ['id'])
-    op.create_foreign_key(None, 'orders', 'tables', ['table_id'], ['id'])
+    op.drop_constraint('orders_venue_id_fkey', 'orders', type_='foreignkey')
+    op.drop_constraint('orders_table_id_fkey', 'orders', type_='foreignkey')
+    op.create_foreign_key('orders_venue_id_fkey', 'orders', 'venues', ['venue_id'], ['id'])
+    op.create_foreign_key('orders_table_id_fkey', 'orders', 'tables', ['table_id'], ['id'])
