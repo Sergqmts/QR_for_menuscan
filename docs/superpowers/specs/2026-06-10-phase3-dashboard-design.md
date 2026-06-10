@@ -115,11 +115,10 @@ Each row shows: photo thumbnail, name, weight, price, availability switch, actio
 1. `<input type="file">` → file selected
 2. `react-image-crop` with `aspect=1` — user crops to square
 3. Canvas `toBlob()` → `Blob`
-4. Server Action `uploadDishImage(dishId, blob)`:
-   - Backend issues presigned S3 PUT URL via `POST /venues/{id}/dishes/{dish_id}/upload-url`
-   - Client PUTs blob directly to S3 (presigned URL)
-   - Server Action then calls `PATCH /venues/{id}/dishes/{dish_id}` with the resulting `image_url`
-5. Modal closes, row thumbnail updates.
+4. Server Action `getUploadUrl(dishId)` → backend issues presigned S3 PUT URL via `POST /venues/{id}/dishes/{dish_id}/upload-url`, returns `{ uploadUrl, imageUrl }`
+5. Client PUTs blob directly to S3 via `fetch(uploadUrl, { method: 'PUT', body: blob })`
+6. On S3 success → Server Action `confirmDishImage(dishId, imageUrl)` → `PATCH /venues/{id}/dishes/{dish_id}` with `image_url`
+7. Modal closes, row thumbnail updates.
 
 ### Re-parse Diff
 
@@ -144,7 +143,8 @@ Each row shows: photo thumbnail, name, weight, price, availability switch, actio
 ```typescript
 updateDishPrice(dishId: string, price: number): Promise<void>
 toggleDishAvailability(dishId: string, available: boolean): Promise<void>
-uploadDishImage(dishId: string, blob: Blob): Promise<string>  // returns image_url
+getUploadUrl(dishId: string): Promise<{ uploadUrl: string; imageUrl: string }>
+confirmDishImage(dishId: string, imageUrl: string): Promise<void>
 reorderCategories(venueId: string, categoryIds: string[]): Promise<void>
 applyParseDiff(venueId: string, changes: DiffChange[]): Promise<void>
 ```
