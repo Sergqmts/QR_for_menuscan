@@ -1,4 +1,3 @@
-import asyncio
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -57,11 +56,9 @@ async def get_analytics(
         .limit(10)
     )
 
-    summary_result, daily_result, top_result = await asyncio.gather(
-        db.execute(summary_stmt),
-        db.execute(daily_stmt),
-        db.execute(top_stmt),
-    )
+    summary_result = await db.execute(summary_stmt)
+    daily_result = await db.execute(daily_stmt)
+    top_result = await db.execute(top_stmt)
 
     summary_row = summary_result.one()
     top_rows = top_result.all()
@@ -75,7 +72,7 @@ async def get_analytics(
         ),
         daily=[
             DailyMetric(
-                date=str(row.date),
+                date=row.date,
                 revenue=Decimal(str(row.revenue)),
                 orders=row.orders,
             )

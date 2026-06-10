@@ -1,9 +1,10 @@
+from datetime import date as DateType
 from pydantic import BaseModel
 from decimal import Decimal
 
 
 class DailyMetric(BaseModel):
-    date: str
+    date: DateType
     revenue: Decimal
     orders: int
 

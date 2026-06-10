@@ -71,4 +71,4 @@ async def test_analytics_with_date_filter(client):
 @pytest.mark.asyncio
 async def test_analytics_unauthorized(client):
     r = await client.get(f"/venues/{uuid_mod.uuid4()}/analytics")
-    assert r.status_code == 403
+    assert r.status_code == 401
