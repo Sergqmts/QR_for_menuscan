@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException
@@ -9,7 +10,25 @@ from app.schemas.order import OrderCreate
 
 
 async def create_order(db: AsyncSession, data: OrderCreate) -> Order:
-    total = sum(item.unit_price * item.quantity for item in data.items)
+    from app.models.dish import Dish
+
+    # Resolve prices from DB — never trust client-supplied unit_price
+    order_items_data = []
+    total = Decimal(0)
+    for item_data in data.items:
+        dish_result = await db.execute(
+            select(Dish).where(Dish.id == item_data.dish_id, Dish.venue_id == data.venue_id)
+        )
+        dish = dish_result.scalar_one_or_none()
+        if not dish:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Dish {item_data.dish_id} not found in venue",
+            )
+        server_price = dish.price
+        total += server_price * item_data.quantity
+        order_items_data.append((item_data, server_price))
+
     order = Order(
         id=uuid.uuid4(),
         venue_id=data.venue_id,
@@ -21,7 +40,7 @@ async def create_order(db: AsyncSession, data: OrderCreate) -> Order:
     )
     db.add(order)
     await db.flush()
-    for item_data in data.items:
+    for item_data, server_price in order_items_data:
         db.add(OrderItem(
             id=uuid.uuid4(),
             order_id=order.id,
@@ -29,7 +48,7 @@ async def create_order(db: AsyncSession, data: OrderCreate) -> Order:
             guest_id=item_data.guest_id,
             guest_name=item_data.guest_name,
             quantity=item_data.quantity,
-            unit_price=item_data.unit_price,
+            unit_price=server_price,  # server-derived, not client-supplied
             comment=item_data.comment,
         ))
     await db.commit()

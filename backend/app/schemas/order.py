@@ -2,7 +2,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 ORDER_STATUSES = {"accepted", "cooking", "ready", "served", "cancelled"}
@@ -12,8 +12,8 @@ class OrderItemCreate(BaseModel):
     dish_id: uuid.UUID
     guest_id: str
     guest_name: str | None = None
-    quantity: int = 1
-    unit_price: Decimal
+    quantity: int = Field(default=1, ge=1, le=100)
+    unit_price: Decimal = Field(ge=Decimal('0.01'))
     comment: str | None = None
 
 
