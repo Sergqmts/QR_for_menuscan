@@ -1,5 +1,6 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -28,6 +29,29 @@ async def list_categories(venue_id: uuid.UUID, db: AsyncSession = Depends(get_db
     await get_venue_or_404(db, venue_id, user.id)
     result = await db.execute(select(Category).where(Category.venue_id == venue_id).order_by(Category.sort_order))
     return {"categories": [CategoryOut.model_validate(c) for c in result.scalars().all()]}
+
+
+class CategoryReorder(BaseModel):
+    category_ids: list[uuid.UUID]
+
+
+@router.patch("/{venue_id}/categories/reorder")
+async def reorder_categories(
+    venue_id: uuid.UUID,
+    data: CategoryReorder,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    await get_venue_or_404(db, venue_id, user.id)
+    for i, cat_id in enumerate(data.category_ids):
+        result = await db.execute(
+            select(Category).where(Category.id == cat_id, Category.venue_id == venue_id)
+        )
+        cat = result.scalar_one_or_none()
+        if cat:
+            cat.sort_order = i
+    await db.commit()
+    return {"ok": True}
 
 
 @router.patch("/{venue_id}/categories/{cat_id}", response_model=CategoryOut)

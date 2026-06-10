@@ -83,3 +83,14 @@ def upload_pdf_to_s3(pdf_bytes: bytes, key: str) -> str:
         Bucket=settings.s3_bucket_name, Key=key, Body=pdf_bytes, ContentType="application/pdf"
     )
     return f"{settings.s3_public_url}/{key}"
+
+
+def get_presigned_upload_url(key: str) -> tuple[str, str]:
+    s3 = _get_s3_client()
+    upload_url = s3.generate_presigned_url(
+        "put_object",
+        Params={"Bucket": settings.s3_bucket_name, "Key": key, "ContentType": "image/jpeg"},
+        ExpiresIn=300,
+    )
+    image_url = f"{settings.s3_public_url}/{settings.s3_bucket_name}/{key}"
+    return upload_url, image_url

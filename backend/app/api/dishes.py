@@ -9,6 +9,7 @@ from app.models.user import User
 from app.models.dish import Dish
 from app.schemas.dish import DishCreate, DishUpdate, DishOut
 from app.services.venue_service import get_venue_or_404
+from app.services.qr_service import get_presigned_upload_url
 
 router = APIRouter(prefix="/venues", tags=["dishes"])
 
@@ -53,3 +54,20 @@ async def delete_dish(venue_id: uuid.UUID, dish_id: uuid.UUID, db: AsyncSession 
         raise HTTPException(status_code=404, detail="Dish not found")
     await db.delete(dish)
     await db.commit()
+
+
+@router.post("/{venue_id}/dishes/{dish_id}/upload-url")
+async def get_upload_url(
+    venue_id: uuid.UUID,
+    dish_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    await get_venue_or_404(db, venue_id, user.id)
+    result = await db.execute(select(Dish).where(Dish.id == dish_id, Dish.venue_id == venue_id))
+    dish = result.scalar_one_or_none()
+    if not dish:
+        raise HTTPException(status_code=404, detail="Dish not found")
+    key = f"dishes/{venue_id}/{dish_id}.jpg"
+    upload_url, image_url = get_presigned_upload_url(key)
+    return {"upload_url": upload_url, "image_url": image_url}
