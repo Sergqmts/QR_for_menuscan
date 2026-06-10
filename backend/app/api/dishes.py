@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.models.dish import Dish
-from app.schemas.dish import DishCreate, DishUpdate, DishOut
+from app.schemas.dish import DishCreate, DishUpdate, DishOut, UploadUrlOut
 from app.services.venue_service import get_venue_or_404
 from app.services.qr_service import get_presigned_upload_url
 
@@ -56,7 +56,7 @@ async def delete_dish(venue_id: uuid.UUID, dish_id: uuid.UUID, db: AsyncSession 
     await db.commit()
 
 
-@router.post("/{venue_id}/dishes/{dish_id}/upload-url")
+@router.post("/{venue_id}/dishes/{dish_id}/upload-url", response_model=UploadUrlOut)
 async def get_upload_url(
     venue_id: uuid.UUID,
     dish_id: uuid.UUID,

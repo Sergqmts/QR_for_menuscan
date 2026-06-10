@@ -1,6 +1,5 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -8,7 +7,7 @@ from app.core.database import get_db
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.models.category import Category
-from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryOut
+from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryOut, CategoryReorder
 from app.services.venue_service import get_venue_or_404
 
 router = APIRouter(prefix="/venues", tags=["categories"])
@@ -31,10 +30,6 @@ async def list_categories(venue_id: uuid.UUID, db: AsyncSession = Depends(get_db
     return {"categories": [CategoryOut.model_validate(c) for c in result.scalars().all()]}
 
 
-class CategoryReorder(BaseModel):
-    category_ids: list[uuid.UUID]
-
-
 @router.patch("/{venue_id}/categories/reorder")
 async def reorder_categories(
     venue_id: uuid.UUID,
@@ -43,13 +38,16 @@ async def reorder_categories(
     user: User = Depends(get_current_user),
 ):
     await get_venue_or_404(db, venue_id, user.id)
-    for i, cat_id in enumerate(data.category_ids):
-        result = await db.execute(
-            select(Category).where(Category.id == cat_id, Category.venue_id == venue_id)
+    result = await db.execute(
+        select(Category).where(
+            Category.id.in_(data.category_ids),
+            Category.venue_id == venue_id,
         )
-        cat = result.scalar_one_or_none()
-        if cat:
-            cat.sort_order = i
+    )
+    cats_by_id = {c.id: c for c in result.scalars().all()}
+    for i, cat_id in enumerate(data.category_ids):
+        if cat_id in cats_by_id:
+            cats_by_id[cat_id].sort_order = i
     await db.commit()
     return {"ok": True}
 

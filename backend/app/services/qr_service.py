@@ -92,5 +92,5 @@ def get_presigned_upload_url(key: str) -> tuple[str, str]:
         Params={"Bucket": settings.s3_bucket_name, "Key": key, "ContentType": "image/jpeg"},
         ExpiresIn=300,
     )
-    image_url = f"{settings.s3_public_url}/{settings.s3_bucket_name}/{key}"
+    image_url = f"{settings.s3_public_url}/{key}"
     return upload_url, image_url

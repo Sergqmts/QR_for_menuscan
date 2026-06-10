@@ -47,3 +47,8 @@ class DishOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UploadUrlOut(BaseModel):
+    upload_url: str
+    image_url: str

@@ -25,3 +25,7 @@ class CategoryOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CategoryReorder(BaseModel):
+    category_ids: list[uuid.UUID]
