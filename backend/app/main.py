@@ -8,6 +8,7 @@ from app.api.dishes import router as dishes_router
 from app.api.menu import router as menu_router
 from app.api.parse import router as parse_router
 from app.api.qr import router as qr_router
+from app.api.orders import router as orders_router
 
 app = FastAPI(title="MenuScan API", version="0.1.0")
 
@@ -27,6 +28,7 @@ app.include_router(dishes_router)
 app.include_router(menu_router)
 app.include_router(parse_router)
 app.include_router(qr_router)
+app.include_router(orders_router)
 
 
 @app.get("/health")
