@@ -66,6 +66,7 @@ class TableSessionService:
         raw = await self.redis.hget(key, "guests")
         guests = [g for g in json.loads(raw or "[]") if g["guest_id"] != guest_id]
         await self.redis.hset(key, "guests", json.dumps(guests))
+        await self.redis.expire(key, SESSION_TTL)
 
     async def add_cart_item(self, venue_id: str, table_id: str, item: dict) -> dict:
         key = self._key(venue_id, table_id)
