@@ -1,5 +1,4 @@
 import uuid
-import asyncio
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,14 +44,9 @@ async def reparse(venue_id: uuid.UUID, db: AsyncSession = Depends(get_db), user:
     await db.commit()
     await db.refresh(job)
 
-    from app.workers.parser import run_parse_job
-    from app.core.database import AsyncSessionLocal
-
-    async def _run():
-        async with AsyncSessionLocal() as bg_db:
-            await run_parse_job(bg_db, job.id)
-
-    asyncio.create_task(_run())
+    from app.core.arq_queue import get_arq_pool
+    pool = await get_arq_pool()
+    await pool.enqueue_job("run_parse_job", str(job.id))
     return {"parse_job_id": job.id, "status": "queued"}
 
 
@@ -67,14 +61,9 @@ async def reparse_diff(venue_id: uuid.UUID, db: AsyncSession = Depends(get_db), 
     await db.commit()
     await db.refresh(job)
 
-    from app.workers.parser import run_parse_job
-    from app.core.database import AsyncSessionLocal
-
-    async def _run():
-        async with AsyncSessionLocal() as bg_db:
-            await run_parse_job(bg_db, job.id)
-
-    asyncio.create_task(_run())
+    from app.core.arq_queue import get_arq_pool
+    pool = await get_arq_pool()
+    await pool.enqueue_job("run_parse_job", str(job.id))
     return {"parse_job_id": job.id, "status": "queued"}
 
 
