@@ -4,7 +4,6 @@ import io
 import uuid
 from datetime import datetime, timezone
 
-import httpx
 from bs4 import BeautifulSoup
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -124,18 +123,9 @@ async def run_parse_job(db: AsyncSession, job_id: uuid.UUID) -> None:
     await db.commit()
 
     try:
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as http:
-            resp = await http.get(job.source_url)
-            resp.raise_for_status()
-
-        selectors = {
-            "item": ".menu-item, .dish, .product, [class*='menu-item'], [class*='dish']",
-            "name": ".name, .title, h3, h4, [class*='name'], [class*='title']",
-            "price": ".price, [class*='price'], [class*='cost']",
-            "weight": ".weight, .volume, [class*='weight'], [class*='gram']",
-            "description": ".description, .desc, [class*='desc']",
-        }
-        dishes_data = extract_dishes_from_html(resp.text, selectors)
+        from app.workers.playwright_parser import fetch_html_auto, MENU_SELECTORS
+        html = await fetch_html_auto(job.source_url)
+        dishes_data = extract_dishes_from_html(html, MENU_SELECTORS)
 
         venue_result = await db.execute(select(Venue).where(Venue.id == job.venue_id))
         venue = venue_result.scalar_one()
