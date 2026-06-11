@@ -61,4 +61,26 @@ async def websocket_kitchen(
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    from sqlalchemy import text
+    from redis.asyncio import from_url as redis_from_url
+    from app.core.config import settings
+
+    db_ok = False
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        pass
+
+    redis_ok = False
+    try:
+        r = redis_from_url(settings.redis_url)
+        await r.ping()
+        await r.aclose()
+        redis_ok = True
+    except Exception:
+        pass
+
+    status = "ok" if (db_ok and redis_ok) else "degraded"
+    return {"status": status, "db": db_ok, "redis": redis_ok}
