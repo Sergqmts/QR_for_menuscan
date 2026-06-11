@@ -24,7 +24,7 @@ dependencies = [
     "reportlab>=4.2.0",
     "pillow>=10.3.0",
     "python-multipart>=0.0.9",
-    "arq>=0.25.0",
+    "arq>=0.26.1",
 ]
 
 [project.optional-dependencies]
