@@ -1,4 +1,5 @@
 import pytest
+import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
@@ -32,6 +33,32 @@ async def test_playwright_fetch_returns_page_html():
         "http://example.com", wait_until="networkidle", timeout=60000
     )
     assert mock_page.evaluate.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_playwright_fetch_closes_browser_on_goto_exception():
+    """_playwright_fetch closes the browser even when page.goto raises."""
+    mock_page = AsyncMock()
+    mock_page.goto = AsyncMock(side_effect=Exception("timeout"))
+
+    mock_browser = AsyncMock()
+    mock_browser.new_page = AsyncMock(return_value=mock_page)
+    mock_browser.close = AsyncMock()
+
+    mock_chromium = AsyncMock()
+    mock_chromium.launch = AsyncMock(return_value=mock_browser)
+
+    mock_pw_ctx = MagicMock()
+    mock_pw_ctx.chromium = mock_chromium
+    mock_pw_ctx.__aenter__ = AsyncMock(return_value=mock_pw_ctx)
+    mock_pw_ctx.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("app.workers.playwright_parser.async_playwright", return_value=mock_pw_ctx):
+        from app.workers.playwright_parser import _playwright_fetch
+        with pytest.raises(Exception, match="timeout"):
+            await _playwright_fetch("http://example.com")
+
+    mock_browser.close.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -75,6 +102,27 @@ async def test_fetch_html_auto_uses_playwright_when_sparse():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(return_value=mock_response)
+
+    with patch("app.workers.playwright_parser.httpx.AsyncClient", return_value=mock_client), \
+         patch("app.workers.playwright_parser._playwright_fetch", new_callable=AsyncMock, return_value=playwright_html) as mock_pw:
+        import app.workers.playwright_parser as mod
+        result = await mod.fetch_html_auto("http://example.com")
+
+    assert result == playwright_html
+    mock_pw.assert_awaited_once_with("http://example.com")
+
+
+@pytest.mark.asyncio
+async def test_fetch_html_auto_uses_playwright_on_http_error():
+    """fetch_html_auto falls back to Playwright when httpx raises HTTPError."""
+    playwright_html = "<html><body>menu via playwright</body></html>"
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(side_effect=httpx.HTTPStatusError(
+        "403", request=MagicMock(), response=MagicMock()
+    ))
 
     with patch("app.workers.playwright_parser.httpx.AsyncClient", return_value=mock_client), \
          patch("app.workers.playwright_parser._playwright_fetch", new_callable=AsyncMock, return_value=playwright_html) as mock_pw:

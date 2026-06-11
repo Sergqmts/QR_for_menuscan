@@ -15,26 +15,32 @@ MENU_SELECTORS = {
 
 
 async def _playwright_fetch(url: str, timeout_ms: int = 60000) -> str:
+    if async_playwright is None:
+        raise RuntimeError("playwright is not installed; install backend[worker]")
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
-        for _ in range(3):
-            await page.evaluate("window.scrollBy(0, window.innerHeight)")
-            await page.wait_for_timeout(1000)
-        html = await page.content()
-        await browser.close()
-        return html
+        try:
+            page = await browser.new_page()
+            await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+            for _ in range(3):
+                await page.evaluate("window.scrollBy(0, window.innerHeight)")
+                await page.wait_for_timeout(1000)
+            return await page.content()
+        finally:
+            await browser.close()
 
 
 async def fetch_html_auto(url: str) -> str:
-    """Fetch page HTML; falls back to Playwright when httpx yields <3 dishes."""
+    """Fetch page HTML; falls back to Playwright when httpx yields <3 dishes or fails."""
     from app.workers.parser import extract_dishes_from_html
 
-    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+        if len(extract_dishes_from_html(resp.text, MENU_SELECTORS)) >= 3:
+            return resp.text
+    except httpx.HTTPError:
+        pass
 
-    if len(extract_dishes_from_html(resp.text, MENU_SELECTORS)) < 3:
-        return await _playwright_fetch(url)
-    return resp.text
+    return await _playwright_fetch(url)
