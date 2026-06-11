@@ -82,5 +82,10 @@ async def health():
     except Exception:
         pass
 
-    status = "ok" if (db_ok and redis_ok) else "degraded"
-    return {"status": status, "db": db_ok, "redis": redis_ok}
+    healthy = db_ok and redis_ok
+    status = "ok" if healthy else "degraded"
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=200 if healthy else 503,
+        content={"status": status, "db": db_ok, "redis": redis_ok},
+    )

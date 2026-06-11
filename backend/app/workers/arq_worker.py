@@ -1,7 +1,6 @@
 import uuid
 
-from arq.connections import RedisSettings
-from urllib.parse import urlparse
+from app.core.arq_queue import _redis_settings
 
 
 async def run_parse_job(ctx: dict, job_id: str) -> None:
@@ -10,17 +9,6 @@ async def run_parse_job(ctx: dict, job_id: str) -> None:
 
     async with AsyncSessionLocal() as db:
         await execute_parse_job(db, uuid.UUID(job_id))
-
-
-def _redis_settings() -> RedisSettings:
-    from app.core.config import settings
-    parsed = urlparse(settings.redis_url)
-    return RedisSettings(
-        host=parsed.hostname or "localhost",
-        port=parsed.port or 6379,
-        password=parsed.password,
-        database=int((parsed.path or "/0").lstrip("/") or 0),
-    )
 
 
 class WorkerSettings:

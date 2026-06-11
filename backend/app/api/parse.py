@@ -58,6 +58,7 @@ async def reparse_diff(venue_id: uuid.UUID, db: AsyncSession = Depends(get_db), 
 
     job = ParseJob(id=uuid.uuid4(), venue_id=venue_id, source_url=venue.website_url, status="queued", diff_mode=True)
     db.add(job)
+    venue.parse_status = "parsing"
     await db.commit()
     await db.refresh(job)
 
