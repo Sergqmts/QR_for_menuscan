@@ -1,4 +1,5 @@
 import io
+import os
 import boto3
 from botocore.config import Config
 import qrcode
@@ -6,9 +7,32 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from PIL import Image
 
 from app.core.config import settings
+
+_FONTS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "fonts")
+_RL_FONTS_DIR = os.path.join(
+    os.path.dirname(__file__),
+    "..", "..", "..",
+    # reportlab ships Vera fonts inside the package
+)
+
+def _register_fonts() -> tuple[str, str]:
+    """Return (regular_font, bold_font) names, registering TTF if needed."""
+    try:
+        import reportlab
+        rl_fonts = os.path.join(os.path.dirname(reportlab.__file__), "fonts")
+        pdfmetrics.registerFont(TTFont("_Vera", os.path.join(rl_fonts, "Vera.ttf")))
+        pdfmetrics.registerFont(TTFont("_VeraBd", os.path.join(rl_fonts, "VeraBd.ttf")))
+        return "_Vera", "_VeraBd"
+    except Exception:
+        return "Helvetica", "Helvetica-Bold"
+
+
+_FONT_REG, _FONT_BOLD = _register_fonts()
 
 
 def generate_qr_image_bytes(url: str) -> bytes:
@@ -33,7 +57,7 @@ def build_qr_pdf(venue_name: str, qr_entries: list[dict]) -> bytes:
 
     for page_start in range(0, max(len(qr_entries), 1), per_page):
         page_entries = qr_entries[page_start:page_start + per_page]
-        c.setFont("Helvetica-Bold", 14)
+        c.setFont(_FONT_BOLD, 14)
         c.drawCentredString(page_width / 2, page_height - 1.5 * cm, venue_name)
 
         for idx, entry in enumerate(page_entries):
@@ -43,7 +67,7 @@ def build_qr_pdf(venue_name: str, qr_entries: list[dict]) -> bytes:
             y = page_height - 3 * cm - (row + 1) * cell_h + (cell_h - qr_size) / 2
             qr_img = Image.open(io.BytesIO(generate_qr_image_bytes(entry["url"])))
             c.drawImage(ImageReader(qr_img), x, y, width=qr_size, height=qr_size)
-            c.setFont("Helvetica-Bold", 12)
+            c.setFont(_FONT_BOLD, 12)
             c.drawCentredString(col * cell_w + cell_w / 2, y - 0.6 * cm, f"Стол {entry['table_number']}")
 
         c.showPage()

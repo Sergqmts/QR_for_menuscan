@@ -15,6 +15,7 @@ class VenueUpdate(BaseModel):
     name: str | None = None
     address: str | None = None
     cuisine_type: str | None = None
+    website_url: str | None = None
     settings: dict | None = None
     is_active: bool | None = None
 
@@ -25,6 +26,7 @@ class VenueOut(BaseModel):
     slug: str
     address: str | None
     cuisine_type: str | None
+    website_url: str | None
     table_count: int
     parse_status: str
     is_active: bool

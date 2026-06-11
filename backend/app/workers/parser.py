@@ -23,6 +23,28 @@ def normalize_price(raw: str) -> float | None:
 
 def extract_dishes_from_html(html: str, selectors: dict) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
+
+    # Strategy 1: standard CSS selectors (generic menu markup)
+    results = _extract_by_css(soup, selectors)
+    if results:
+        return results
+
+    # Strategy 2: data-prod-* attributes (iiko WebMenu, secret-kitchen style)
+    results = _extract_by_data_prod(soup)
+    if results:
+        return results
+
+    # Strategy 3: JSON-LD structured data (schema.org/MenuItem)
+    results = _extract_by_jsonld(soup)
+    if results:
+        return results
+
+    # Strategy 4: heuristic — elements whose text matches price pattern
+    results = _extract_by_price_heuristic(soup)
+    return results
+
+
+def _extract_by_css(soup: BeautifulSoup, selectors: dict) -> list[dict]:
     items = soup.select(selectors.get("item", ".menu-item"))
     results = []
     for item in items:
@@ -45,6 +67,89 @@ def extract_dishes_from_html(html: str, selectors: dict) -> list[dict]:
             "description": desc_el.get_text(strip=True) if desc_el else None,
             "category": None,
         })
+    return results
+
+
+def _extract_by_data_prod(soup: BeautifulSoup) -> list[dict]:
+    """Handle sites that store dish data in data-prod-* attributes (iiko WebMenu, etc.)."""
+    items = soup.select("[data-prod-name][data-prod-price]")
+    results = []
+    seen = set()
+    for item in items:
+        name = item.get("data-prod-name", "").strip()
+        price = normalize_price(item.get("data-prod-price", ""))
+        if not name or price is None:
+            continue
+        key = (name.lower(), price)
+        if key in seen:
+            continue
+        seen.add(key)
+        category = item.get("data-prod-category") or item.get("data-category") or None
+        weight = item.get("data-prod-weight") or item.get("data-weight") or None
+        results.append({"name": name, "price": price, "weight": weight, "description": None, "category": category})
+    return results
+
+
+def _extract_by_jsonld(soup: BeautifulSoup) -> list[dict]:
+    """Extract schema.org/MenuItem from JSON-LD script tags."""
+    import json
+    results = []
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(script.string or "")
+        except Exception:
+            continue
+        items = data if isinstance(data, list) else [data]
+        for obj in items:
+            # unwrap @graph
+            if obj.get("@type") == "Restaurant" and "hasMenu" in obj:
+                obj = obj["hasMenu"]
+            if obj.get("@type") in ("Menu", "MenuSection"):
+                for section in obj.get("hasMenuSection", [obj]):
+                    for entry in section.get("hasMenuItem", []):
+                        name = entry.get("name", "").strip()
+                        offer = entry.get("offers", {})
+                        price = normalize_price(str(offer.get("price", "")))
+                        if not name or price is None:
+                            continue
+                        results.append({
+                            "name": name,
+                            "price": price,
+                            "weight": None,
+                            "description": entry.get("description"),
+                            "category": section.get("name"),
+                        })
+    return results
+
+
+def _extract_by_price_heuristic(soup: BeautifulSoup) -> list[dict]:
+    """Last resort: find any element containing a price next to a name-like sibling."""
+    _PRICE_RE = re.compile(r"^\s*(\d[\d\s]*)\s*(?:руб|₽|р\.?)\s*$", re.IGNORECASE)
+    results = []
+    seen = set()
+    for el in soup.find_all(True):
+        text = el.get_text(strip=True)
+        m = _PRICE_RE.match(text)
+        if not m:
+            continue
+        price = normalize_price(m.group(1))
+        if price is None or price < 10 or price > 100_000:
+            continue
+        # look for a name sibling or parent heading
+        parent = el.parent
+        if parent is None:
+            continue
+        siblings = [s for s in parent.children if hasattr(s, "get_text") and s is not el]
+        name = next((s.get_text(strip=True) for s in siblings if 3 < len(s.get_text(strip=True)) < 120), None)
+        if not name:
+            continue
+        key = (name.lower(), price)
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append({"name": name, "price": price, "weight": None, "description": None, "category": None})
+        if len(results) >= 300:
+            break
     return results
 
 

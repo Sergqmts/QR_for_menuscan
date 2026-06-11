@@ -13,6 +13,7 @@ export interface Venue {
   slug: string;
   address: string | null;
   cuisine_type: string | null;
+  website_url: string | null;
   table_count: number;
   parse_status: string;
   is_active: boolean;
