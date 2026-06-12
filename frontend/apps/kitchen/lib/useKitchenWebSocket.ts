@@ -23,7 +23,7 @@ export interface KitchenOrder {
 
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000, 30000];
 
-export function useKitchenWebSocket(venueId: string, token: string) {
+export function useKitchenWebSocket(venueId: string, token: string, code = "") {
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [status, setStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const wsRef = useRef<WebSocket | null>(null);
@@ -44,7 +44,8 @@ export function useKitchenWebSocket(venueId: string, token: string) {
     if (!mountedRef.current) return;
     setStatus("connecting");
 
-    const url = `${WS_BASE}/ws/kitchen/${venueId}?token=${token}`;
+    const qs = code ? `code=${code}` : `token=${token}`;
+    const url = `${WS_BASE}/ws/kitchen/${venueId}?${qs}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
 

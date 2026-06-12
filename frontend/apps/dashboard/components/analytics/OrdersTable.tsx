@@ -34,18 +34,13 @@ export default function OrdersTable({ venueId }: { venueId: string }) {
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
   const LIMIT = 20;
-
-  function getToken() {
-    return document.cookie.match(/(?:^|;\s*)token=([^;]+)/)?.[1] ?? "";
-  }
 
   useEffect(() => {
     const sp = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
     if (status) sp.set("status", status);
     setLoading(true);
-    fetch(`${API}/venues/${venueId}/orders?${sp}`, { headers: { Authorization: `Bearer ${getToken()}` } })
+    fetch(`/api/venues/${venueId}/orders?${sp}`)
       .then((r) => r.json())
       .then((d) => { setOrders(d.orders ?? []); setTotal(d.total ?? 0); })
       .finally(() => setLoading(false));
@@ -54,7 +49,7 @@ export default function OrdersTable({ venueId }: { venueId: string }) {
   async function handleExportCSV() {
     const sp = new URLSearchParams({ format: "csv" });
     if (status) sp.set("status", status);
-    const res = await fetch(`${API}/venues/${venueId}/orders?${sp}`, { headers: { Authorization: `Bearer ${getToken()}` } });
+    const res = await fetch(`/api/venues/${venueId}/orders?${sp}`);
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

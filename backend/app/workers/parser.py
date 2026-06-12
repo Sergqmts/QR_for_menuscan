@@ -101,14 +101,30 @@ def _extract_by_jsonld(soup: BeautifulSoup) -> list[dict]:
             continue
         items = data if isinstance(data, list) else [data]
         for obj in items:
+            if not isinstance(obj, dict):
+                continue
             # unwrap @graph
             if obj.get("@type") == "Restaurant" and "hasMenu" in obj:
-                obj = obj["hasMenu"]
-            if obj.get("@type") in ("Menu", "MenuSection"):
-                for section in obj.get("hasMenuSection", [obj]):
+                has_menu = obj["hasMenu"]
+                # hasMenu can be a single dict or a list of menu objects
+                candidates = has_menu if isinstance(has_menu, list) else [has_menu]
+            else:
+                candidates = [obj]
+            for menu_obj in candidates:
+                if not isinstance(menu_obj, dict):
+                    continue
+                if menu_obj.get("@type") not in ("Menu", "MenuSection"):
+                    continue
+                for section in menu_obj.get("hasMenuSection", [menu_obj]):
+                    if not isinstance(section, dict):
+                        continue
                     for entry in section.get("hasMenuItem", []):
+                        if not isinstance(entry, dict):
+                            continue
                         name = entry.get("name", "").strip()
                         offer = entry.get("offers", {})
+                        if isinstance(offer, list):
+                            offer = offer[0] if offer else {}
                         price = normalize_price(str(offer.get("price", "")))
                         if not name or price is None:
                             continue
@@ -277,10 +293,13 @@ async def run_parse_job(db: AsyncSession, job_id: uuid.UUID) -> None:
         await db.commit()
 
     except Exception as exc:
+        # Roll back any partial transaction before writing failure state.
+        await db.rollback()
         job.status = "failed"
         job.error_message = str(exc)
         job.finished_at = datetime.now(timezone.utc)
         venue_result = await db.execute(select(Venue).where(Venue.id == job.venue_id))
-        venue = venue_result.scalar_one()
-        venue.parse_status = "failed"
+        venue = venue_result.scalar_one_or_none()
+        if venue:
+            venue.parse_status = "failed"
         await db.commit()

@@ -53,10 +53,11 @@ async def websocket_kitchen(
     websocket: WebSocket,
     venue_id: uuid_mod.UUID,
     token: str = "",
+    code: str = "",
 ):
     from app.ws.kitchen import ws_kitchen_handler
     async with AsyncSessionLocal() as db:
-        await ws_kitchen_handler(websocket, venue_id, token, db)
+        await ws_kitchen_handler(websocket, venue_id, token, db, code=code)
 
 
 @app.get("/health")

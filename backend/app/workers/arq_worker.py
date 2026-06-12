@@ -15,5 +15,5 @@ class WorkerSettings:
     functions = [run_parse_job]
     redis_settings = _redis_settings()
     max_jobs = 5
-    job_timeout = 120
-    max_tries = 3
+    job_timeout = 300  # 5 min — Playwright on JS-heavy SPAs needs up to 2-3 min
+    max_tries = 2

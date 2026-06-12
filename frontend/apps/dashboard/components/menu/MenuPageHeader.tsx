@@ -17,19 +17,18 @@ export default function MenuPageHeader({ venue, venueId }: Props) {
 
   async function handleParse() {
     setParsing(true);
-    const token = document.cookie.match(/(?:^|;\s*)token=([^;]+)/)?.[1] ?? "";
-    const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
     try {
-      await fetch(`${API}/venues/${venueId}/reparse-diff`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const deadline = Date.now() + 60000;
+      const startRes = await fetch(`/api/venues/${venueId}/parse`, { method: "POST" });
+      if (!startRes.ok) {
+        alert("Не удалось запустить парсинг");
+        return;
+      }
+
+      // Poll for up to 3 minutes — Playwright on JS-heavy sites can take 1-2 min
+      const deadline = Date.now() + 180_000;
       while (Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const res = await fetch(`${API}/venues/${venueId}/parse-status`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await new Promise((r) => setTimeout(r, 3000));
+        const res = await fetch(`/api/venues/${venueId}/parse`);
         const data = await res.json();
         if (data.status === "done") {
           setDiffChanges(data.diff_data ?? []);
@@ -40,7 +39,7 @@ export default function MenuPageHeader({ venue, venueId }: Props) {
           return;
         }
       }
-      alert("Парсинг занял слишком долго");
+      alert("Парсинг занял слишком долго (>3 мин)");
     } catch {
       alert("Ошибка при запуске парсинга");
     } finally {

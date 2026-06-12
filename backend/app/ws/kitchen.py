@@ -24,16 +24,36 @@ def _msg(type_: str, payload: dict) -> str:
     return json.dumps({"type": type_, "payload": payload, "timestamp": _now()})
 
 
+_HANDOFF_PREFIX = "kitchen_handoff:"
+
+
+async def _resolve_token(token: str, code: str, redis: aioredis.Redis) -> str:
+    """Return the JWT to use, resolving a handoff code if provided.
+    Codes are single-use: the key is deleted atomically on first read."""
+    if token:
+        return token
+    if code:
+        key = f"{_HANDOFF_PREFIX}{code}"
+        resolved = await redis.getdel(key)  # atomic get-and-delete (Redis ≥ 6.2)
+        return resolved or ""
+    return ""
+
+
 async def ws_kitchen_handler(
     websocket: WebSocket,
     venue_id: uuid.UUID,
     token: str,
     db: AsyncSession,
+    code: str = "",
 ):
     await websocket.accept()
 
+    auth_redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+    resolved_token = await _resolve_token(token, code, auth_redis)
+    await auth_redis.aclose()
+
     # Verify token and ownership
-    user_id_str = decode_access_token(token)
+    user_id_str = decode_access_token(resolved_token)
     if not user_id_str:
         await websocket.close(code=4001, reason="Invalid token")
         return

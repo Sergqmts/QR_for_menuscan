@@ -9,14 +9,16 @@ export default function KitchenPage({
   searchParams,
 }: {
   params: { venueId: string };
-  searchParams: { token?: string };
+  searchParams: { token?: string; code?: string };
 }) {
   const token = searchParams.token ?? "";
+  const code = searchParams.code ?? "";
   const [filterStatus, setFilterStatus] = useState<string>("all");
 
   const { orders, status, updateOrderStatus } = useKitchenWebSocket(
     params.venueId,
-    token
+    token,
+    code,
   );
 
   const filtered =

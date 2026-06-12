@@ -131,3 +131,29 @@ async def test_fetch_html_auto_uses_playwright_on_http_error():
 
     assert result == playwright_html
     mock_pw.assert_awaited_once_with("http://example.com")
+
+
+@pytest.mark.asyncio
+async def test_fetch_html_auto_uses_playwright_for_spa():
+    """fetch_html_auto goes straight to Playwright when page has Vue/Bitrix SPA signs."""
+    # Page with {{ template }} — looks like Vue/Bitrix SPA
+    spa_html = """<html><head><script>BX.ready(function(){});</script></head>
+    <body><div>{{ product.price }}</div></body></html>"""
+    playwright_html = "<html><body>full menu</body></html>"
+
+    mock_response = MagicMock()
+    mock_response.text = spa_html
+    mock_response.raise_for_status = MagicMock()
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=mock_response)
+
+    with patch("app.workers.playwright_parser.httpx.AsyncClient", return_value=mock_client), \
+         patch("app.workers.playwright_parser._playwright_fetch", new_callable=AsyncMock, return_value=playwright_html) as mock_pw:
+        import app.workers.playwright_parser as mod
+        result = await mod.fetch_html_auto("http://spa-example.com")
+
+    assert result == playwright_html
+    mock_pw.assert_awaited_once_with("http://spa-example.com")
